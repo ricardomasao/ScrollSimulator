@@ -1,4 +1,4 @@
-/*! ScrollSimulator - v1.0 - 2014-10-13
+/*! ScrollSimulator - v1.1 - 2014-11-26
  *
  *
  * Copyright (c) 2014 Ricardo Masao Shigeoka;
@@ -29,10 +29,18 @@ function ScrollSimulator(parent)
   this.events = {}
 }
 
-ScrollSimulator.prototype.init = function (num_pages) {
-  NUM_PAGES = num_pages;
+ScrollSimulator.prototype.init = function (arr) {
+  this.arr = arr;
+  NUM_PAGES = arr.length;
 
   this.setup_style();
+  this.resize();
+}
+
+ScrollSimulator.prototype.update = function (arr) {
+  this.arr = arr;
+  NUM_PAGES = arr.length;
+
   this.resize();
 }
 
@@ -68,13 +76,43 @@ ScrollSimulator.prototype.disable = function(){
   scroll_guide.style.display = "none";
 }
 
+ScrollSimulator.prototype.dispose = function(){
+  this.disable();
+  this.parent.removeChild(scroll_guide);
+
+  this.parent = null;
+
+  this.main_scroll_percent = null;
+  this.section_percent = null;
+  this.current_page = null;
+  this.events = null
+}
+
 ScrollSimulator.prototype.on_scroll_handler = function(event){
 
   var doc = document.documentElement;
   var scroll_top = (window.pageYOffset || doc.scrollTop)  - (doc.clientTop || 0);
 
   _this.main_scroll_percent = scroll_top / (scroll_guide.offsetHeight - window.innerHeight);
-  _this.current_page = Math.round( scroll_top / ((scroll_guide.offsetHeight - window.innerHeight)/(NUM_PAGES-1)) );
+
+  var i = 0;
+  var offset = 0;
+  var size = 0;
+
+  _this.current_page = 0;
+
+  while(i < NUM_PAGES){
+    size = (_this.arr[i].size == 'window') ? Math.round(window.innerHeight*SCROLL_SENSIBILITY) : _this.arr[i].size;
+
+    if( scroll_top > offset && scroll_top <= offset + size ){
+      _this.current_page = i;
+    };
+
+    offset += size;
+    i++;
+  };
+
+  //_this.current_page = Math.round( scroll_top / ((scroll_guide.offsetHeight - window.innerHeight)/(NUM_PAGES-1)) );
 
   _this.section_percent = _this.get_section_percent(_this.current_page);
 
@@ -82,11 +120,21 @@ ScrollSimulator.prototype.on_scroll_handler = function(event){
 }
 
 ScrollSimulator.prototype.get_section_percent = function(page){
+  var section_height = (_this.arr[page].size == 'window') ? Math.round(window.innerHeight*SCROLL_SENSIBILITY) : _this.arr[page].size;
   var doc = document.documentElement;
   var scroll_top = (window.pageYOffset || doc.scrollTop)  - (doc.clientTop || 0);
-  var percentage_per_pages =  scroll_top / ((scroll_guide.offsetHeight - window.innerHeight)/NUM_PAGES);
 
-  return percentage_per_pages - page
+  var i =0;
+  var offset = 0;
+  while(i < NUM_PAGES){
+    if(i == page)break;
+    offset += (_this.arr[i].size == 'window') ? Math.round(window.innerHeight*SCROLL_SENSIBILITY) : _this.arr[i].size;
+    i++;
+  }
+
+  var percentage_per_pages =  scroll_top / (offset + section_height)
+
+  return percentage_per_pages
 }
 
 ScrollSimulator.prototype.resize = function(){
@@ -98,7 +146,12 @@ ScrollSimulator.prototype.resize = function(){
 
   while(i < NUM_PAGES)
   {
-    h += window.innerHeight*SCROLL_SENSIBILITY;
+    if(this.arr[i].size == 'window'){
+      h += window.innerHeight*SCROLL_SENSIBILITY;
+    } else {
+      h += this.arr[i].size;
+    }
+
     i++;
   }
 
@@ -126,6 +179,8 @@ ScrollSimulator.prototype.addEventListener = function(eventName, callback){
   callbacks.push(callback);
 }
 ScrollSimulator.prototype.eventDispatcher = function(eventName, args){
+  if (!this.events) return
+
   var callbacks = this.events[eventName];
 
   if(!callbacks) return;
